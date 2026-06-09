@@ -1,4 +1,4 @@
-# AutoTube-12
+# AutoTube Shorts
 
 Ollama ile script, ElevenLabs ile ses, MoviePy ile render ve YouTube planlama — çok kanallı YouTube Shorts otomasyonu.
 
@@ -70,6 +70,7 @@ cp .env.example .env
 | `PORT` | Flask portu (varsayılan `5000`) |
 | `MIN_VIDEO_SECONDS` / `MAX_VIDEO_SECONDS` | Video süresi hedefi (varsayılan 30–60 sn) |
 | `SCHEDULE_DISPLAY_TIMEZONE` / `SCHEDULE_DAILY_HOUR` / `SCHEDULE_DAILY_MINUTE` | Otomatik planlama saati (ör. İstanbul 20:00) |
+| `YOUTUBE_DECLARE_SYNTHETIC_MEDIA` | `true` = YouTube yüklemesinde yapay/sentetik içerik bildirimi |
 
 **`.env` ve gerçek API anahtarlarını asla commit etmeyin.**
 
@@ -108,7 +109,9 @@ cp .env.example .env
    http://127.0.0.1:5000/oauth/youtube/callback
    ```
 
-4. JSON indirin → `config/client_secrets.json` olarak kaydedin
+4. JSON indirin → **`config/client_secrets.json`** olarak kaydedin (`config/creds/` içine değil)
+
+`config/creds/` farklıdır: panelde **Bağla** dedikten sonra uygulama `channel_<id>_token.json` yazar. Bu token dosyaları yerelde görünür, gitignore’dadır, GitHub’da yoktur.
 
 ---
 
@@ -145,7 +148,7 @@ Panel, üretim veya yükleme sırasında **otomatik yenilenir** (istatistikler, 
 
 ## Yayın planlaması
 
-Panel üst çubuğunda **aktif otomatik planlama kuralı** görünür (`.env` dosyasından okunur). Varsayılan saati değiştirmek için `.env` düzenleyip `python app.py` ile uygulamayı yeniden başlatın; panelde ayrı bir saat dropdown'u yoktur.
+Varsayılan saat: `.env` → `SCHEDULE_DISPLAY_TIMEZONE`, `SCHEDULE_DAILY_HOUR`, `SCHEDULE_DAILY_MINUTE` (sonra `python app.py` yeniden başlat). Üst çubukta aktif kural görünür.
 
 ### Yayın saati üç yolla ayarlanır
 
@@ -184,22 +187,7 @@ SCHEDULE_DAILY_MINUTE=30
 
 Uygulamayı yeniden başlatın. Panel üstünde yeni kural görünür (ör. `Daily 18:30 Europe/Istanbul`).
 
-İsteğe bağlı gelişmiş ayarlar (`config/settings.py` varsayılanları): `SCHEDULE_MIN_LEAD_MINUTES`, `SCHEDULE_US_PEAK_HOURS`, `SCHEDULE_TIMEZONE`.
-
-**Tek video** için yeniden başlatma gerekmez: **Hazır videolar → Düzenle & planla** ile istediğiniz tarih/saati seçin.
-
-### Neden panelde saat dropdown'u yok?
-
-Genel ayarlar `.env` içinde kalır; CLI (`python main.py schedule`) ile aynı kaynaktan okunur. Panel dropdown'u config yazıp sunucuyu yeniden başlatmayı gerektirirdi; şimdilik `.env` tek kaynak. Üst çubukta aktif kural okunur; video bazında **Hazır** bölümündeki tarih/saat alanı kullanılır.
-
-### İlgili `.env` değişkenleri
-
-| Değişken | Açıklama |
-|----------|----------|
-| `SCHEDULE_DISPLAY_TIMEZONE` | Saat dilimi (ör. `Europe/Istanbul`) |
-| `SCHEDULE_DAILY_HOUR` / `SCHEDULE_DAILY_MINUTE` | Günlük saat (ör. `20` / `0` → 20:00) |
-
-`SCHEDULE_INTERVAL_HOURS`, `SCHEDULE_STAGGER_MINUTES`, `SCHEDULE_TIMEZONE`, `SCHEDULE_US_PEAK_HOURS` günlük modda **gerekmez**; kod içi varsayılanlar kullanılır.
+**Tek video:** **Hazır videolar → Düzenle & planla** (yeniden başlatma gerekmez).
 
 ---
 
@@ -253,7 +241,7 @@ Ses ve kurallar: `config/niches.json`. Yeni niche: aşağıdaki [Yeni niche ekle
 3. **Bağla** → Google hesap seçici açılır (önce kanal yoksa yukarıdaki **Yeni kanal ekle** ile oluşturun)
 4. İzinleri onaylayın
 
-Token'lar `config/creds/` içinde saklanır (git'e eklenmez).
+**Bağla** sonrası: `config/creds/channel_<id>_token.json` (kanal başına bir dosya). Google Console JSON’unu buraya koymayın — sadece uygulamanın ürettiği token’lar.
 
 ---
 
@@ -297,26 +285,6 @@ Aynı niche'te birden fazla YouTube kanalı çalıştırabilirsiniz; ses ve AI k
 
 ---
 
-## Kanal seed (ilk kurulum)
-
-Veritabanı boşsa `config/channels_config.json` örnek kanalları yükler:
-
-```json
-{
-  "channels": [
-    { "channel_name": "Motivation Channel", "niche": "motivation" },
-    { "channel_name": "Beauty Channel", "niche": "beauty" }
-  ]
-}
-```
-
-- **channel_name** — panelde görünen ad
-- **niche** — `config/niches.json` içindeki slug ile eşleşmeli
-
-`config/channels_config.json.example` dosyasını kopyalayabilir veya panelden kanal ekleyebilirsiniz.
-
----
-
 ## CLI (isteğe bağlı)
 
 ```bash
@@ -337,12 +305,18 @@ Günlük kullanım için web paneli önerilir.
 autotube-shorts/
 ├── app.py              # Flask panel
 ├── main.py             # CLI
-├── core/i18n.py        # EN/TR çeviriler
 ├── config/
+│   ├── niches.json     # Niche ses + AI kuralları
+│   ├── voices.json     # Ses kataloğu
+│   ├── template_styles.json   # Niche altyazı renkleri
+│   ├── client_secrets.json          # SİZ: Google OAuth JSON (gitignore)
+│   ├── client_secrets.json.example
+│   └── creds/                       # UYGULAMA: channel_*_token.json (gitignore)
+├── core/
 ├── templates/dashboard.html
-├── assets/backgrounds/
-├── assets/outputs/
-└── data/               # SQLite (gitignore)
+├── assets/backgrounds/ # MP4 arka planlar (yerelde ekle)
+├── assets/outputs/     # Render çıktıları (gitignore)
+└── data/               # pipeline.db + oauth_state.json (gitignore, çalışınca oluşur)
 ```
 
 ---

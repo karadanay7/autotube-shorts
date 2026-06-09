@@ -1,1 +1,1 @@
-"""Core pipeline modules for AutoTube-12."""
+"""Core pipeline modules for AutoTube Shorts."""

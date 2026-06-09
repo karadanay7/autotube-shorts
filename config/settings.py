@@ -15,8 +15,6 @@ BRANDING_DIR = PROJECT_ROOT / "assets" / "branding"
 FONTS_DIR = PROJECT_ROOT / "assets" / "fonts"
 TEMPLATE_STYLES_FILE = PROJECT_ROOT / "config" / "template_styles.json"
 CREDS_DIR = PROJECT_ROOT / "config" / "creds"
-CHANNELS_CONFIG = PROJECT_ROOT / "config" / "channels_config.json"
-
 # Server
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "5001"))

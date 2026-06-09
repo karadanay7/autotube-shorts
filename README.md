@@ -20,7 +20,7 @@ ollama serve && ollama pull deepseek-r1:8b
 python app.py
 ```
 
-Open **http://127.0.0.1:5000** — panel language: **EN** / **TR** (top right).
+Open **http://127.0.0.1:5000** — add channels under **Channels & settings**. Panel language: **EN** / **TR** (top right).
 
 ## Pipeline
 

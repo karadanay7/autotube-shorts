@@ -1,4 +1,4 @@
-# AutoTube-12
+# AutoTube Shorts
 
 Automated YouTube Shorts pipeline with a local admin panel. Generate scripts with **Ollama**, voice with **ElevenLabs**, render vertical videos with **MoviePy**, then schedule and upload to **YouTube** — one channel per Google account.
 
@@ -48,7 +48,7 @@ ollama pull deepseek-r1:8b
 python app.py
 ```
 
-Open **http://127.0.0.1:5000** — the admin panel loads with example channels from `config/channels_config.json`.
+Open **http://127.0.0.1:5000** — add your first channel under **Channels & settings → Add another channel**.
 
 ---
 
@@ -72,6 +72,7 @@ cp .env.example .env
 | `PORT` | Flask port (default `5000`) — must match OAuth redirect URI |
 | `SCHEDULE_DISPLAY_TIMEZONE` | Timezone for daily auto-schedule (e.g. `Europe/Istanbul`) |
 | `SCHEDULE_DAILY_HOUR` / `SCHEDULE_DAILY_MINUTE` | Daily publish time (e.g. `20` / `0` → 20:00 in that timezone) |
+| `YOUTUBE_DECLARE_SYNTHETIC_MEDIA` | `true` = YouTube upload sets altered/synthetic content disclosure |
 
 **Never commit `.env` or real API keys.**
 
@@ -149,6 +150,8 @@ Paste your values into `config/client_secrets.json`:
 
 Or rename the file downloaded from Google Console to `config/client_secrets.json` and ensure `redirect_uris` includes the callback above.
 
+**Not the same as `config/creds/`:** you only create `client_secrets.json` once (Google app credentials). After you click **Connect** in the panel, the app writes `config/creds/channel_<id>_token.json` per channel automatically. Those token files are local and gitignored — you will see them on your machine but they are **not** in the GitHub repo.
+
 ---
 
 ## ElevenLabs API key
@@ -221,26 +224,6 @@ When you add a channel in the panel, you only pick **panel name** + **niche**. V
 
 You can run multiple YouTube channels on the same niche (e.g. two motivation channels); they share voice and AI rules but have separate queues and OAuth accounts.
 
----
-
-## Channels configuration (seed only)
-
-On first run, example channels are imported from `config/channels_config.json` if the database is empty:
-
-```json
-{
-  "channels": [
-    { "channel_name": "Motivation Channel", "niche": "motivation" },
-    { "channel_name": "Beauty Channel", "niche": "beauty" }
-  ]
-}
-```
-
-- **channel_name** — label in the admin panel (your YouTube brand name)
-- **niche** — must match a slug in `config/niches.json`
-
-Copy `config/channels_config.json.example` for a minimal seed, or add channels in the panel (see below).
-
 ### Built-in niches (dropdown)
 
 | Niche slug | Default voice (ElevenLabs) |
@@ -251,8 +234,6 @@ Copy `config/channels_config.json.example` for a minimal seed, or add channels i
 | `tech` | Daniel |
 | `health` | Rachel |
 | `gaming` | Josh |
-
-Edit voices and AI rules in `config/niches.json`. Add more niches anytime (see [Adding a new niche](#adding-a-new-niche)).
 
 ---
 
@@ -294,7 +275,7 @@ You can run two channels on the same niche (e.g. two motivation brands); they sh
 4. Google opens an account picker — choose the Google account that owns that YouTube channel
 5. Approve permissions → you are redirected back to the panel
 
-Each channel stores its token in `config/creds/` (gitignored).
+After **Connect**, the app saves `config/creds/channel_<id>_token.json` (one file per panel channel). Do not copy Google Console JSON into `creds/` — that folder is only for tokens the app generates.
 
 No email is entered in the UI — OAuth uses Google's account picker (`select_account`).
 
@@ -335,7 +316,7 @@ The panel **auto-refreshes** while production or upload runs (stats, queue, read
 
 ## Publishing schedule
 
-The panel header shows the **active auto-schedule rule** (read from your `.env`). Changing the default time is done in `.env`, not in a dropdown — restart `python app.py` after edits.
+Default publish time: `.env` → `SCHEDULE_DISPLAY_TIMEZONE`, `SCHEDULE_DAILY_HOUR`, `SCHEDULE_DAILY_MINUTE` (restart `python app.py`). The panel header shows the active rule.
 
 ### Three ways to set a publish time
 
@@ -375,13 +356,7 @@ SCHEDULE_DAILY_MINUTE=30
 
 Restart the app. The panel header updates to show the new rule (e.g. `Daily 18:30 Europe/Istanbul`).
 
-Optional advanced vars (defaults in `config/settings.py`): `SCHEDULE_MIN_LEAD_MINUTES`, `SCHEDULE_US_PEAK_HOURS`, `SCHEDULE_TIMEZONE`.
-
-**Per-video override** does not require restart: open **Ready videos → Edit & schedule** and choose any date/time.
-
-### Why no schedule dropdown in the panel?
-
-Global defaults live in `.env` so they stay stable across restarts and match the CLI (`python main.py schedule`). A panel dropdown would need to write config and restart the server; for now, `.env` is the single source of truth. The header shows the current rule; per-video times use the datetime picker in **Ready**.
+**Per-video:** **Ready videos → Edit & schedule** (no restart).
 
 ---
 
@@ -406,17 +381,19 @@ autotube-shorts/
 ├── app.py                 # Flask admin panel
 ├── main.py                # CLI orchestrator
 ├── config/
-│   ├── channels_config.json
+│   ├── niches.json        # Niche voice + AI rules
+│   ├── voices.json        # Voice catalog (labels)
+│   ├── template_styles.json   # Subtitle colors per niche
+│   ├── client_secrets.json          # YOU: Google OAuth app JSON (gitignored)
 │   ├── client_secrets.json.example
-│   ├── voices.json
-│   └── creds/             # OAuth tokens (gitignored)
+│   └── creds/                       # APP: channel_*_token.json after Connect (gitignored)
 ├── core/                  # LLM, TTS, video, YouTube, scheduler
 ├── templates/dashboard.html
 ├── assets/
-│   ├── backgrounds/<niche>/   # Background MP4 files
-│   ├── outputs/                 # Rendered videos
-│   └── temp/                    # Audio, timestamps
-└── data/                  # SQLite DB (gitignored)
+│   ├── backgrounds/<niche>/   # Background MP4 files (add locally)
+│   ├── outputs/                 # Rendered videos (gitignored)
+│   └── temp/                    # Audio, timestamps (gitignored)
+└── data/                  # pipeline.db + oauth_state.json (gitignored, created at runtime)
 ```
 
 ---
@@ -428,8 +405,8 @@ These files contain secrets or personal data and are listed in `.gitignore`:
 | Path | Contents |
 |------|----------|
 | `.env` | API keys |
-| `config/client_secrets.json` | Google OAuth client secret |
-| `config/creds/*` | YouTube OAuth tokens |
+| `config/client_secrets.json` | Google OAuth **app** credentials (you add from Console) |
+| `config/creds/channel_*_token.json` | YouTube **access tokens** (app creates on Connect) |
 | `data/` | SQLite database with job history |
 | `assets/outputs/*` | Rendered videos |
 

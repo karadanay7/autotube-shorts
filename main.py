@@ -1,5 +1,5 @@
 """
-AutoTube-12 Central Orchestrator
+AutoTube Shorts — CLI orchestrator
 
 Usage:
     python main.py run              # Process all PENDING jobs
@@ -474,7 +474,7 @@ def run_uploads(*, channel_id: Optional[int] = None) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="AutoTube-12 Pipeline Orchestrator")
+    parser = argparse.ArgumentParser(description="AutoTube Shorts pipeline")
     sub = parser.add_subparsers(dest="command")
 
     run_parser = sub.add_parser("run", help="Process pending video jobs")

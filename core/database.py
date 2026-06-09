@@ -1,5 +1,5 @@
 """
-SQLite database layer for AutoTube-12.
+SQLite database layer for AutoTube Shorts.
 
 Handles connection management, schema migrations, and video_jobs state transitions.
 """

@@ -80,7 +80,6 @@ from core.scheduler import (
     sync_all_channels_from_youtube,
     sync_channel_from_youtube,
 )
-from core.seed import seed_channels_from_config
 from core.video_editor import VIDEO_EXTENSIONS, list_backgrounds
 from core.youtube_uploader import (
     YouTubeUploaderError,
@@ -1391,9 +1390,6 @@ def serve_background(filename: str):
 def bootstrap() -> None:
     ensure_dirs()
     init_db()
-    seeded = seed_channels_from_config()
-    if seeded:
-        print(f"  → {seeded} channel(s) seeded from channels_config.json")
     oauth = oauth_redirect_status()
     print(f"  → OAuth redirect: {oauth['redirect_uri']}")
     print(
@@ -1404,7 +1400,7 @@ def bootstrap() -> None:
 
 if __name__ == "__main__":
     bootstrap()
-    print(f"\n  AutoTube-12 Admin Panel")
+    print(f"\n  AutoTube Shorts — Admin Panel")
     print(f"  → http://{HOST}:{PORT}")
     print(f"  → Videolar: {OUTPUTS_DIR}")
     print(f"  → Backgrounds: {BACKGROUNDS_DIR}\n")

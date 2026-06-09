@@ -67,8 +67,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "tr": "Aktif kural: {summary}. Kanal başına takvim gününde bir hazır video (dolu günler atlanır).",
     },
     "help.schedule_change": {
-        "en": "Default time: .env → SCHEDULE_DAILY_HOUR, SCHEDULE_DAILY_MINUTE, SCHEDULE_DISPLAY_TIMEZONE, then restart. Per video: Ready → Edit & schedule.",
-        "tr": "Varsayılan saat: .env → SCHEDULE_DAILY_HOUR, SCHEDULE_DAILY_MINUTE, SCHEDULE_DISPLAY_TIMEZONE, sonra yeniden başlat. Tek video: Hazır → Düzenle & planla.",
+        "en": "Change default in .env (SCHEDULE_*), restart app. Per video: Ready → Edit & schedule.",
+        "tr": "Varsayılan: .env (SCHEDULE_*), uygulamayı yeniden başlat. Tek video: Hazır → Düzenle & planla.",
     },
     "help.queue_retry": {
         "en": "Produce runs pending jobs only. Failed jobs need Retry (row) or Retry failed (header). Nothing runs automatically unless you click Produce or Retry.",
