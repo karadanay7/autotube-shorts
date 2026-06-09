@@ -1,0 +1,44 @@
+# --- Secrets & local config (never commit) ---
+.env
+.env.local
+.env.*.local
+config/client_secrets.json
+config/creds/*
+!config/creds/.gitkeep
+
+# --- Local database & OAuth state ---
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Generated / downloaded media ---
+assets/outputs/*
+!assets/outputs/.gitkeep
+assets/temp/*
+!assets/temp/.gitkeep
+assets/backgrounds/**/*.mp4
+*.mp3
+*.webm
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.cursor/
+
+# --- Logs ---
+*.log

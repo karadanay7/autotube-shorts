@@ -1,0 +1,48 @@
+{
+  "default": {
+    "subtitle_color": [255, 255, 255],
+    "accent_color": [255, 255, 255],
+    "stroke_color": [0, 0, 0],
+    "stroke_width": 6,
+    "blur_sigma": 2,
+    "darken_opacity": 0.42,
+    "font_size": 76,
+    "subtitle_y_ratio": 0.62
+  },
+  "motivation": {
+    "subtitle_color": [255, 255, 255],
+    "stroke_width": 7,
+    "darken_opacity": 0.38,
+    "blur_sigma": 2
+  },
+  "finance": {
+    "subtitle_color": [100, 255, 180],
+    "accent_color": [0, 200, 120],
+    "darken_opacity": 0.48,
+    "blur_sigma": 3
+  },
+  "tech": {
+    "subtitle_color": [255, 255, 255],
+    "stroke_width": 6,
+    "darken_opacity": 0.5,
+    "blur_sigma": 3
+  },
+  "health": {
+    "subtitle_color": [144, 238, 144],
+    "accent_color": [50, 205, 50],
+    "darken_opacity": 0.4
+  },
+  "gaming": {
+    "subtitle_color": [255, 0, 128],
+    "accent_color": [0, 200, 255],
+    "darken_opacity": 0.45,
+    "blur_sigma": 2
+  },
+  "beauty": {
+    "subtitle_color": [255, 230, 240],
+    "accent_color": [255, 182, 193],
+    "stroke_width": 5,
+    "darken_opacity": 0.36,
+    "blur_sigma": 2
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "niches": {
+    "motivation": {
+      "label": "Motivation",
+      "elevenlabs_voice_id": "TX3LPaxmHKxFdv7VOQHJ",
+      "tone_rules": "Energetic, short, motivating. Speak directly to the viewer in second person. Strong hooks, actionable lines, no filler.",
+      "extra_prompt": ""
+    },
+    "beauty": {
+      "label": "Beauty",
+      "elevenlabs_voice_id": "cgSgspJ2msm6clMCkdW9",
+      "tone_rules": "Warm, elegant, fascinating tone for timeless beauty. Cover skin care, body care, hair, and natural glow. Focus on old beauty secrets and rituals from different cultures and eras. Educational storytelling, never salesy. NEVER mention brand names or tell viewers to buy anything. Use only generic natural ingredients. Hook with a surprising historical fact.",
+      "extra_prompt": "Beauty channel content rules:\n- Topics: ancient beauty rituals by region, forgotten natural ingredients, what queens and grandmothers used, cross-cultural beauty secrets, era-specific routines, natural skin/body/hair care.\n- Scripts: one clear secret or ritual per Short. Name the culture or era when relevant.\n- Visual keywords: women skincare, natural beauty, spa, flowers, herbs, mirror, soft light.\n- Forbidden: brands, product placements, buy links, celebrity endorsements, dermatology claims."
+    },
+    "finance": {
+      "label": "Finance",
+      "elevenlabs_voice_id": "pNInz6obpgDQGcFmaJgB",
+      "tone_rules": "Clear, confident, educational. Explain money concepts in plain language. No hype and no get-rich-quick promises. Speak directly to the viewer with practical takeaways.",
+      "extra_prompt": "Finance Shorts rules:\n- Topics: budgeting, saving, investing basics, common money mistakes, simple financial literacy.\n- Scripts: one idea per Short with a concrete example or number when helpful.\n- Forbidden: guaranteed returns, specific stock picks, affiliate links, personalized financial advice stated as fact.\n- Visual keywords: charts, coins, city skyline, office, calculator, green tones."
+    },
+    "tech": {
+      "label": "Tech",
+      "elevenlabs_voice_id": "onwK4e9ZLuTAKqWW03F9",
+      "tone_rules": "Sharp, curious, accessible. Explain one tech idea per Short. Define jargon immediately. Focus on what changed and why it matters.",
+      "extra_prompt": "Tech Shorts rules:\n- Topics: gadgets, software tips, AI basics, security hygiene, productivity tools, future trends explained simply.\n- Scripts: hook with a surprising fact, then explain in plain English.\n- Forbidden: unverified leaks, affiliate codes, brand wars, toxic fanboy tone.\n- Visual keywords: laptop, code screen, neon, circuits, smartphone, futuristic city."
+    },
+    "health": {
+      "label": "Health & Wellness",
+      "elevenlabs_voice_id": "21m00Tcm4TlvDq8ikWAM",
+      "tone_rules": "Calm, supportive, evidence-minded. Share general wellness habits and mindfulness. Never diagnose or prescribe. Use soft disclaimers when needed.",
+      "extra_prompt": "Health Shorts rules:\n- Topics: sleep, hydration, stretching, breathing, habits, nutrition basics, stress relief.\n- Scripts: one actionable habit per Short; encourage consistency over perfection.\n- Forbidden: medical claims, cure promises, supplement sales, before/after guarantees.\n- Visual keywords: nature, yoga, water, sunrise, healthy food, peaceful room."
+    },
+    "gaming": {
+      "label": "Gaming",
+      "elevenlabs_voice_id": "TxGEqnHWrfWFTfGW9HjV",
+      "tone_rules": "Fast, hype-friendly, conversational. One tip, fact, or hot take per Short. Speak like a friend who loves games.",
+      "extra_prompt": "Gaming Shorts rules:\n- Topics: tips, lore, comparisons, nostalgia, indie highlights, mechanics explained simply.\n- Scripts: strong opener in the first line; keep energy high.\n- Forbidden: toxic trash talk, unverified leaks presented as fact, harassment.\n- Visual keywords: controller, RGB setup, esports arena, retro console, gameplay blur background."
+    }
+  }
+}

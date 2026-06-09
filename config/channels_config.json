@@ -1,0 +1,12 @@
+{
+  "channels": [
+    {
+      "channel_name": "Motivation Channel",
+      "niche": "motivation"
+    },
+    {
+      "channel_name": "Beauty Channel",
+      "niche": "beauty"
+    }
+  ]
+}

@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ active_channel_name }} — {{ t('app.title') }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .channel-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a1a1aa'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 0.6rem center; background-size: 1rem;
+    }
+    details.panel > summary { list-style: none; }
+    details.panel > summary::-webkit-details-marker { display: none; }
+    details.panel[open] > summary .panel-chevron { transform: rotate(180deg); }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+
+  <header class="border-b border-zinc-800 bg-zinc-900 sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-red-600 to-purple-700 flex items-center justify-center text-xs font-bold shrink-0">AT</div>
+          <div class="min-w-0">
+            <h1 class="text-base font-bold leading-tight">{{ t('app.title') }}</h1>
+            <p class="text-[11px] text-zinc-500 truncate">{{ active_channel_name }} · {{ active_channel.niche if active_channel else '' }}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="flex text-[10px] border border-zinc-700 rounded-lg overflow-hidden">
+            <a href="{{ url_for('set_language', code='en') }}"
+              class="px-2 py-1 {% if locale == 'en' %}bg-zinc-700 text-white{% else %}text-zinc-500 hover:text-zinc-300{% endif %}">EN</a>
+            <a href="{{ url_for('set_language', code='tr') }}"
+              class="px-2 py-1 {% if locale == 'tr' %}bg-zinc-700 text-white{% else %}text-zinc-500 hover:text-zinc-300{% endif %}">TR</a>
+          </div>
+          {% if active_channel_thumbnail %}
+          <img src="{{ active_channel_thumbnail }}" alt="" class="w-8 h-8 rounded-full object-cover border border-zinc-700 hidden sm:block" />
+          {% endif %}
+          <select id="channel-picker"
+            class="channel-select appearance-none pl-3 pr-8 py-2 text-sm font-medium rounded-lg border border-zinc-700 bg-zinc-800 min-w-[11rem] max-w-[14rem] focus:outline-none focus:ring-2 focus:ring-purple-500/50">
+            {% for ch in channel_picker %}
+            <option value="{{ ch.id }}" {% if ch.active %}selected{% endif %}>
+              {% if ch.youtube_connected %}✓ {% else %}○ {% endif %}{{ ch.name }}{% if ch.badge %} ({{ ch.badge }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-zinc-800/80">
+        <form action="{{ url_for('sync_youtube_schedule') }}" method="post" class="inline">
+          <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+          <button type="submit" class="text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-1.5 rounded-lg">{{ t('action.sync') }}</button>
+        </form>
+        <form action="{{ url_for('auto_schedule') }}" method="post" class="inline">
+          <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+          <button type="submit" class="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg">{{ t('action.schedule') }}</button>
+        </form>
+        <form id="upload-form" action="{% if active_channel_id %}{{ url_for('upload_scheduled', channel_id=active_channel_id) }}{% else %}{{ url_for('upload_scheduled') }}{% endif %}" method="post"
+          class="inline js-upload-trigger {% if upload_active %}hidden{% endif %}">
+          <input type="hidden" name="return_channel" value="{{ active_channel_id | default(0) }}" />
+          <button type="submit" class="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg">
+            {{ t('action.upload') }}{% if upload_ready_count %} (<span id="upload-count">{{ upload_ready_count }}</span>){% endif %}
+          </button>
+        </form>
+        <p class="w-full text-[10px] text-zinc-500 leading-relaxed mt-1">
+          <span class="text-purple-400/90">{{ t('label.schedule_auto') }}:</span>
+          {{ t('help.schedule_mode', summary=schedule_peak_summary) }}
+          {{ t('help.schedule_change') }}
+        </p>
+        <span id="upload-busy"
+          class="text-xs bg-emerald-900/50 text-emerald-200 border border-emerald-500/30 px-3 py-1.5 rounded-lg font-medium inline-flex items-center gap-1.5 {% if not upload_active %}hidden{% endif %}">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="upload-busy-label">{{ t('banner.uploading') }}…</span>
+        </span>
+        <form id="produce-form" action="{{ url_for('run_pipeline') }}" method="post"
+          class="inline js-pipeline-trigger {% if processing_active or production_count == 0 %}hidden{% endif %}">
+          <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+          <button type="submit" class="text-xs bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg font-medium">
+            {{ t('action.produce') }} (<span id="produce-count">{{ production_count }}</span>)
+          </button>
+        </form>
+        <form id="retry-failed-form" action="{{ url_for('retry_all_failed_jobs') }}" method="post"
+          class="inline js-pipeline-trigger {% if processing_active or failed_count == 0 %}hidden{% endif %}">
+          <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+          <button type="submit" class="text-xs bg-orange-700 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg font-medium">
+            {{ t('action.retry_all_failed') }} (<span id="retry-failed-count">{{ failed_count }}</span>)
+          </button>
+        </form>
+        <span id="produce-busy"
+          class="text-xs bg-red-900/50 text-red-200 border border-red-500/30 px-3 py-1.5 rounded-lg font-medium inline-flex items-center gap-1.5 {% if not processing_active %}hidden{% endif %}">
+          <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>
+          <span id="produce-busy-label">
+            {{ t('banner.producing') }}{% if active_job_id %} #{{ active_job_id }}{% endif %}{% if pending_production_count %} · {{ pending_production_count }} {{ t('banner.queued') }}{% endif %}…
+          </span>
+        </span>
+        <span class="text-[10px] text-zinc-600 ml-auto">{% if api.ollama %}AI ✓{% else %}AI ✗{% endif %} · {% if api.elevenlabs %}TTS ✓{% endif %}</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-5 space-y-3">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="space-y-2">
+      {% for category, message in messages %}
+      <div class="rounded-lg px-4 py-2.5 text-sm {% if category == 'error' %}bg-red-500/10 text-red-300 border border-red-500/20{% else %}bg-emerald-500/10 text-emerald-300 border border-emerald-500/20{% endif %}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div class="rounded-lg border border-zinc-800 bg-zinc-900/80 p-2.5">
+        <p class="text-[10px] uppercase text-zinc-500">{{ t('stat.pending') }}</p>
+        <p id="stat-pending" class="text-lg font-bold text-slate-300">{{ counts.PENDING }}</p>
+      </div>
+      <div class="rounded-lg border border-zinc-800 bg-zinc-900/80 p-2.5">
+        <p class="text-[10px] uppercase text-zinc-500">{{ t('stat.processing') }}</p>
+        <p id="stat-processing" class="text-lg font-bold text-blue-300">{{ stat_processing }}</p>
+      </div>
+      <div class="rounded-lg border border-purple-500/25 bg-purple-500/5 p-2.5">
+        <p class="text-[10px] uppercase text-purple-400">{{ t('stat.ready') }}</p>
+        <p id="stat-ready" class="text-lg font-bold text-purple-300">{{ stat_ready }}</p>
+      </div>
+      <div class="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-2.5">
+        <p class="text-[10px] uppercase text-emerald-400">{{ t('stat.youtube') }}</p>
+        <p id="stat-youtube" class="text-lg font-bold text-emerald-400">{{ stat_youtube }}</p>
+      </div>
+      <div class="rounded-lg border border-zinc-800 bg-zinc-900/80 p-2.5 col-span-2 sm:col-span-1">
+        <p class="text-[10px] uppercase text-zinc-500">{{ t('stat.failed') }}</p>
+        <p id="stat-failed" class="text-lg font-bold text-red-400">{{ counts.FAILED }}</p>
+      </div>
+    </div>
+
+    <p id="processing-banner"
+      class="text-xs text-blue-400 flex items-center gap-2 {% if not processing_active %}hidden{% endif %}">
+      <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+      <span id="processing-banner-text">
+        {{ t('banner.production_progress') }}{% if active_job_id %} — {{ t('banner.job') }} #{{ active_job_id }}{% endif %}
+        {% if pending_production_count %} · {{ pending_production_count }} {{ t('banner.more_in_queue') }}{% endif %}
+      </span>
+      <form action="{{ url_for('reset_stuck_jobs') }}" method="post" class="inline">
+        <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+        <button type="submit" class="underline text-zinc-400">{{ t('action.reset_stuck') }}</button>
+      </form>
+    </p>
+
+    <details class="panel rounded-xl border border-red-500/25 bg-red-500/[0.04] overflow-hidden" open>
+      <summary class="px-4 py-3 cursor-pointer flex items-center justify-between gap-2 hover:bg-zinc-900/30">
+        <div>
+          <h2 class="text-sm font-semibold text-red-100">{{ t('section.production') }}</h2>
+          <p class="text-[11px] text-zinc-500">{{ t('help.niche_voice', niche=active_channel.niche if active_channel else '', voice=channel_voice_label) }}</p>
+        </div>
+        <span class="panel-chevron text-zinc-500 text-xs transition-transform">▼</span>
+      </summary>
+      <div class="px-4 pb-4 border-t border-red-500/10 pt-4 grid sm:grid-cols-2 gap-4">
+        <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2">
+          <h3 class="text-xs font-medium text-zinc-400">{{ t('section.single_topic') }}</h3>
+          <form action="{{ url_for('create_job') }}" method="post" class="space-y-2">
+            <input type="hidden" name="channel_id" value="{{ active_channel_id }}" />
+            <input type="text" name="raw_topic" placeholder="{{ t('placeholder.topic') }}" required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm" />
+            <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white rounded-lg py-2 text-sm">{{ t('form.add_queue') }}</button>
+          </form>
+        </div>
+        <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2">
+          <h3 class="text-xs font-medium text-zinc-400">{{ t('section.ai_topics') }}</h3>
+          <form action="{{ url_for('generate_topics') }}" method="post" class="space-y-2">
+            <input type="hidden" name="channel_id" value="{{ active_channel_id }}" />
+            <select name="count" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm">
+              <option value="3">3</option>
+              <option value="7" selected>7</option>
+              <option value="14">14</option>
+            </select>
+            <label class="flex items-center gap-2 text-xs text-zinc-500">
+              <input type="checkbox" name="run_production" class="rounded" /> {{ t('form.run_after') }}
+            </label>
+            <button type="submit" class="w-full bg-purple-600 hover:bg-purple-500 text-white rounded-lg py-2 text-sm">{{ t('form.generate_topics') }}</button>
+          </form>
+        </div>
+        <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2 sm:col-span-2">
+          <h3 class="text-xs font-medium text-zinc-400">{{ t('section.bulk_topics') }}</h3>
+          <form action="{{ url_for('create_bulk_jobs') }}" method="post" class="space-y-2">
+            <input type="hidden" name="channel_id" value="{{ active_channel_id }}" />
+            <textarea name="topics" rows="3" placeholder="{{ t('placeholder.bulk') }}" required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm"></textarea>
+            <button type="submit" class="w-full bg-zinc-700 hover:bg-zinc-600 rounded-lg py-2 text-sm">{{ t('form.add_all') }}</button>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel rounded-xl border border-blue-500/25 bg-blue-500/[0.03] overflow-hidden" {% if queue_jobs or processing_active %}open{% endif %}>
+      <summary class="px-4 py-3 cursor-pointer flex items-center justify-between gap-2 hover:bg-zinc-900/30">
+        <div>
+          <h2 class="text-sm font-semibold text-blue-100">{{ t('section.queue') }}</h2>
+          <p class="text-[11px] text-zinc-500">
+            {{ t('queue.summary', pending=counts.PENDING, processing=stat_processing) }}
+            {% if failed_count %}· <span class="text-red-400">{{ t('queue.failed', n=failed_count) }}</span>{% endif %}
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] bg-blue-500/15 text-blue-300 px-2 py-0.5 rounded-full">{{ queue_jobs|length }}</span>
+          <span class="panel-chevron text-zinc-500 text-xs transition-transform">▼</span>
+        </div>
+      </summary>
+      <div class="border-t border-blue-500/10">
+        {% if queue_jobs %}
+        <form id="queue-bulk-actions" method="post"
+          class="js-bulk-actions-form flex flex-wrap items-center gap-2 px-4 py-2 border-b border-blue-500/10 bg-zinc-900/40"
+          data-bulk-panel="queue">
+          <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+          <button type="button" class="js-bulk-select-all text-[11px] text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded border border-zinc-700">
+            {{ t('action.select_all') }}
+          </button>
+          <button type="button" class="js-bulk-clear text-[11px] text-zinc-500 hover:text-zinc-300 px-2 py-1">
+            {{ t('action.clear_selection') }}
+          </button>
+          <button type="submit" formaction="{{ url_for('bulk_retry_jobs') }}"
+            class="js-bulk-submit js-bulk-retry text-[11px] bg-orange-900/50 hover:bg-orange-800 text-orange-200 px-3 py-1 rounded border border-orange-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled>
+            {{ t('action.retry_selected') }} (<span class="js-bulk-count">0</span>)
+          </button>
+          <button type="submit" formaction="{{ url_for('bulk_delete_jobs') }}"
+            class="js-bulk-submit js-bulk-delete text-[11px] bg-red-900/50 hover:bg-red-800 text-red-200 px-3 py-1 rounded border border-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled>
+            {{ t('action.delete_selected') }} (<span class="js-bulk-count">0</span>)
+          </button>
+        </form>
+        <p class="px-4 pb-2 text-[10px] text-zinc-600 border-b border-blue-500/10">{{ t('help.queue_retry') }}</p>
+        <div class="divide-y divide-zinc-800/50">
+          {% for row in queue_jobs %}
+          <div class="px-4 py-3 flex items-center justify-between gap-3" data-job-id="{{ row.job.id }}" data-job-status="{{ row.job.status.value }}">
+            <label class="shrink-0 flex items-center">
+              <input type="checkbox" form="queue-bulk-actions" name="job_ids" value="{{ row.job.id }}"
+                class="js-bulk-check w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-red-600 focus:ring-red-500/40"
+                data-bulk-panel="queue" />
+            </label>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium truncate">#{{ row.job.id }} — {{ row.job.title or row.job.raw_topic }}</p>
+              <p class="text-[11px] mt-0.5">
+                <span class="inline-block px-1.5 py-0.5 rounded {{ row.status_color }} text-[10px]">{{ row.status_label }}</span>
+                <span class="text-zinc-500 ml-1">{{ row.voice_label }}</span>
+              </p>
+              {% if row.job.error_log %}<p class="text-[10px] text-red-400 mt-1 truncate">{{ row.job.error_log }}</p>{% endif %}
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              {% if row.job.status.value in ['GENERATING_TEXT', 'GENERATING_AUDIO', 'RENDERING'] %}
+              <span class="js-job-active text-xs text-blue-400 px-2.5 py-1">{{ t('label.job_active') }}</span>
+              {% elif row.job.status.value in ['PENDING', 'FAILED'] %}
+              <form action="{{ url_for('run_pipeline') }}" method="post"
+                class="js-run-job js-pipeline-trigger {% if processing_active %}hidden{% endif %}">
+                <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+                <input type="hidden" name="job_id" value="{{ row.job.id }}" />
+                <button type="submit" class="text-xs {% if row.job.status.value == 'FAILED' %}bg-orange-600/80 hover:bg-orange-500{% else %}bg-red-600/80 hover:bg-red-500{% endif %} text-white px-2.5 py-1 rounded-lg">
+                  {% if row.job.status.value == 'FAILED' %}{{ t('action.retry') }}{% else %}{{ t('action.run') }}{% endif %}
+                </button>
+              </form>
+              <span class="js-queued-label text-xs text-zinc-500 px-2.5 py-1 {% if not processing_active or row.job.status.value == 'FAILED' %}hidden{% endif %}">{{ t('label.queued') }}</span>
+              {% endif %}
+              <form action="{{ url_for('delete_job', job_id=row.job.id) }}" method="post" onsubmit="return confirm('{{ t('confirm.delete_job') }}');">
+                <button type="submit" class="text-xs text-zinc-600 hover:text-red-400">{{ t('action.delete') }}</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="px-4 py-8 text-sm text-zinc-500 text-center">{{ t('empty.queue') }}</p>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="panel rounded-xl border border-purple-500/25 bg-purple-500/[0.03] overflow-hidden" {% if ready_jobs %}open{% endif %}>
+      <summary class="px-4 py-3 cursor-pointer flex items-center justify-between gap-2 hover:bg-zinc-900/30">
+        <div>
+          <h2 class="text-sm font-semibold text-purple-100">{{ t('section.ready') }}</h2>
+          <p class="text-[11px] text-zinc-500">{{ t('section.ready_flow') }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <form action="{{ url_for('condense_all_ready_seo') }}" method="post" onclick="event.stopPropagation()">
+            <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+            <button type="submit" class="text-[10px] bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded text-zinc-400">{{ t('action.trim_seo') }}</button>
+          </form>
+          <span class="text-[10px] bg-purple-500/15 text-purple-300 px-2 py-0.5 rounded-full">{{ ready_jobs|length }}</span>
+          <span class="panel-chevron text-zinc-500 text-xs transition-transform">▼</span>
+        </div>
+      </summary>
+      <div class="border-t border-purple-500/10 p-3">
+        {% if ready_jobs %}
+        <form id="ready-bulk-delete" action="{{ url_for('bulk_delete_jobs') }}" method="post"
+          class="js-bulk-delete-form flex flex-wrap items-center gap-2 mb-3 p-2 rounded-lg border border-purple-500/15 bg-zinc-900/40"
+          data-bulk-panel="ready">
+          <input type="hidden" name="return_channel" value="{{ active_channel_id }}" />
+          <button type="button" class="js-bulk-select-all text-[11px] text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded border border-zinc-700">
+            {{ t('action.select_all') }}
+          </button>
+          <button type="button" class="js-bulk-clear text-[11px] text-zinc-500 hover:text-zinc-300 px-2 py-1">
+            {{ t('action.clear_selection') }}
+          </button>
+          <button type="submit" class="js-bulk-submit text-[11px] bg-red-900/50 hover:bg-red-800 text-red-200 px-3 py-1 rounded border border-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+            {{ t('action.delete_selected') }} (<span class="js-bulk-count">0</span>)
+          </button>
+        </form>
+        <div class="grid sm:grid-cols-2 gap-3">
+          {% for row in ready_jobs %}
+          <article class="rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden">
+            <div class="flex gap-2 p-2.5">
+              <label class="shrink-0 pt-1">
+                <input type="checkbox" form="ready-bulk-delete" name="job_ids" value="{{ row.job.id }}"
+                  class="js-bulk-check w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-red-600 focus:ring-red-500/40"
+                  data-bulk-panel="ready" />
+              </label>
+              <div class="flex sm:block flex-1 min-w-0 gap-2">
+                {% if row.video_rel %}
+                <video controls class="w-24 sm:w-full shrink-0 aspect-[9/16] sm:max-h-40 bg-black object-contain"
+                  src="{{ url_for('serve_video', filename=row.video_rel) }}"></video>
+                {% endif %}
+                <div class="flex-1 min-w-0 sm:pt-1">
+                  <p class="text-sm font-medium truncate">{{ row.seo.title }}</p>
+                  <p class="text-[10px] text-zinc-500">#{{ row.job.id }}
+                    {% if row.is_planned %}· <span class="text-amber-400">{{ row.schedule.short }} {{ row.schedule.tz_label }}</span>{% else %}· {{ t('form.awaiting_schedule') }}{% endif %}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <details class="border-t border-zinc-800">
+              <summary class="px-2.5 py-1.5 text-[11px] text-zinc-500 cursor-pointer">{{ t('form.edit_schedule') }}</summary>
+              <div class="px-2.5 pb-2.5 space-y-2">
+                <form action="{{ url_for('update_job_seo', job_id=row.job.id) }}" method="post" class="space-y-1.5">
+                  <input type="text" name="title" maxlength="100" required value="{{ row.seo.title }}"
+                    class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs" />
+                  <textarea name="description" rows="2" maxlength="{{ max_desc_chars }}" required
+                    class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs resize-none">{{ row.seo.preview or row.job.description or '' }}</textarea>
+                  <button type="submit" class="w-full bg-zinc-700 rounded py-1 text-xs">{{ t('action.save_seo') }}</button>
+                </form>
+                <form action="{{ url_for('schedule_job', job_id=row.job.id) }}" method="post" class="space-y-1">
+                  <input type="hidden" name="scheduled_timezone" value="" class="js-schedule-tz" />
+                  <input type="datetime-local" name="scheduled_time" class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-[11px]" />
+                  <button type="submit" class="w-full bg-purple-600 hover:bg-purple-500 rounded py-1 text-xs text-white">{{ t('action.schedule') }}</button>
+                </form>
+                <form action="{{ url_for('delete_job', job_id=row.job.id) }}" method="post" onsubmit="return confirm('{{ t('confirm.delete_job') }}');">
+                  <button type="submit" class="w-full text-[10px] text-red-400 py-1">{{ t('action.delete') }}</button>
+                </form>
+              </div>
+            </details>
+          </article>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="py-6 text-sm text-zinc-500 text-center">{{ t('empty.ready') }}</p>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="panel rounded-xl border border-emerald-500/20 bg-emerald-500/[0.02] overflow-hidden">
+      <summary class="px-4 py-3 cursor-pointer flex items-center justify-between gap-2 hover:bg-zinc-900/30">
+        <div>
+          <h2 class="text-sm font-semibold text-emerald-100">{{ t('section.on_youtube') }}</h2>
+          <p class="text-[11px] text-zinc-500">{{ t('section.on_youtube_hint') }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] bg-emerald-500/15 text-emerald-300 px-2 py-0.5 rounded-full">{{ youtube_jobs|length }}</span>
+          <span class="panel-chevron text-zinc-500 text-xs transition-transform">▼</span>
+        </div>
+      </summary>
+      <div class="border-t border-emerald-500/10">
+        {% if youtube_jobs %}
+        <div class="divide-y divide-zinc-800/50 max-h-96 overflow-y-auto">
+          {% for row in youtube_jobs %}
+          <div class="px-4 py-3 flex flex-wrap items-center justify-between gap-2 hover:bg-zinc-900/20">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium truncate">{{ row.display_title or (row.job.title if row.job else '') or (row.job.raw_topic if row.job else '') }}</p>
+              <p class="text-[10px] text-zinc-500">{% if row.job %}#{{ row.job.id }}{% else %}{{ t('form.on_youtube_label') }}{% endif %}</p>
+            </div>
+            {% if row.schedule.short %}
+            <p class="text-xs text-emerald-300/90 shrink-0">{{ row.schedule.short }} {{ row.schedule.tz_label }}</p>
+            {% endif %}
+            {% if row.watch_url %}
+            <a href="{{ row.watch_url }}" target="_blank" rel="noopener"
+              class="text-xs text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded shrink-0">{{ t('action.open') }}</a>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="px-4 py-8 text-sm text-zinc-500 text-center">{{ t('empty.youtube') }}</p>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="panel rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
+      <summary class="px-4 py-3 cursor-pointer flex items-center justify-between gap-2 hover:bg-zinc-900/30">
+        <div>
+          <h2 class="text-sm font-semibold text-zinc-200">{{ t('section.settings') }}</h2>
+          <p class="text-[11px] text-zinc-500">{{ t('section.settings_hint') }}</p>
+        </div>
+        <span class="panel-chevron text-zinc-500 text-xs transition-transform">▼</span>
+      </summary>
+      <div class="px-4 pb-4 border-t border-zinc-800 pt-4 space-y-5">
+
+        <div>
+          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1">{{ t('section.youtube_accounts') }}</h3>
+          <p class="text-[10px] text-zinc-600 mb-2">{{ t('help.youtube_accounts') }}</p>
+          <div class="space-y-2">
+            {% for row in channels_enriched %}
+            <div class="rounded-lg border {% if row.channel.id == active_channel_id %}border-purple-500/40 bg-purple-500/5{% else %}border-zinc-800 bg-zinc-950{% endif %} px-3 py-2.5 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                {% if row.channel.youtube_channel_thumbnail %}
+                <img src="{{ row.channel.youtube_channel_thumbnail }}" alt="" class="w-8 h-8 rounded-full object-cover" />
+                {% else %}
+                <div class="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-500">YT</div>
+                {% endif %}
+                <div class="min-w-0">
+                  <p class="text-sm font-medium truncate">{{ row.display_name }}</p>
+                  <p class="text-[10px] text-zinc-500">{{ row.channel.niche }} · {% if row.youtube_connected %}{{ t('label.connected') }}{% else %}{{ t('label.not_connected') }}{% endif %}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                {% if row.channel.id != active_channel_id %}
+                <a href="{{ url_for('dashboard', channel=row.channel.id) }}" class="text-[10px] border border-zinc-700 px-2 py-1 rounded-lg text-zinc-400">{{ t('action.select') }}</a>
+                {% else %}
+                <span class="text-[10px] text-purple-400 px-2">{{ t('label.active') }}</span>
+                {% endif %}
+                {% if row.youtube_connected %}
+                <form action="{{ url_for('youtube_disconnect', channel_id=row.channel.id) }}" method="post">
+                  <button type="submit" class="text-[10px] text-zinc-500 px-2 py-1">{{ t('action.switch_account') }}</button>
+                </form>
+                {% else %}
+                <a href="{{ url_for('youtube_connect', channel_id=row.channel.id) }}"
+                  class="text-[10px] bg-red-700 hover:bg-red-600 text-white px-2.5 py-1 rounded">{{ t('action.connect') }}</a>
+                {% endif %}
+                <form action="{{ url_for('remove_channel', channel_id=row.channel.id) }}" method="post"
+                  onsubmit="return confirm({{ t('confirm.delete_channel', name=row.display_name)|tojson }})">
+                  <button type="submit" class="text-[10px] text-red-400 hover:text-red-300 px-2 py-1">{{ t('action.remove_channel') }}</button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-dashed border-purple-500/35 bg-purple-500/[0.04] p-3 space-y-2">
+          <h3 class="text-xs font-semibold text-purple-200">{{ t('section.add_channel') }}</h3>
+          <form action="{{ url_for('new_channel') }}" method="post" class="space-y-2">
+            <input name="channel_name" placeholder="{{ t('placeholder.panel_name') }}" required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm" />
+            <select name="niche" required class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm">
+              <option value="" disabled selected>{{ t('placeholder.pick_niche') }}</option>
+              {% for n in niches %}
+              <option value="{{ n.slug }}">{{ n.label }}</option>
+              {% endfor %}
+            </select>
+            <p class="text-[10px] text-zinc-600">{{ t('help.new_channel_niche') }}</p>
+            <label class="flex items-center gap-2 text-xs text-zinc-500">
+              <input type="checkbox" name="connect_youtube" checked class="rounded" /> {{ t('form.connect_after') }}
+            </label>
+            <button type="submit" class="w-full bg-purple-700 hover:bg-purple-600 text-white rounded-lg py-2 text-sm font-medium">
+              + {{ t('action.create') }}
+            </button>
+          </form>
+        </div>
+
+        {% if active_channel %}
+        <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2">
+          <h3 class="text-xs font-medium text-zinc-400">{{ t('section.channel_voice') }}</h3>
+          <p class="text-[10px] text-zinc-600">{{ t('help.channel_voice') }}</p>
+          <form action="{{ url_for('update_channel_voice', channel_id=active_channel_id) }}" method="post" class="space-y-2">
+            <select name="elevenlabs_voice_id" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm">
+              <option value="" {% if not channel_voice_override %}selected{% endif %}>
+                {{ t('form.use_niche_voice', voice=niche_voice_label) }}
+              </option>
+              {% for v in voices %}
+              <option value="{{ v.id }}" {% if channel_voice_override == v.id %}selected{% endif %}>{{ v.label }}</option>
+              {% endfor %}
+            </select>
+            <p class="text-[10px] text-zinc-500">{{ t('help.niche_voice', niche=active_channel.niche, voice=channel_voice_label) }}</p>
+            <button type="submit" class="w-full bg-zinc-700 hover:bg-zinc-600 rounded-lg py-2 text-sm">{{ t('action.save') }}</button>
+          </form>
+        </div>
+        {% endif %}
+
+        {% if active_channel %}
+        <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2">
+          <h3 class="text-xs font-medium text-zinc-400">{{ t('section.background') }}</h3>
+          <p class="text-[10px] text-zinc-600">{{ t('label.niche') }}: {{ active_channel.niche }}</p>
+          <form action="{{ url_for('upload_background') }}" method="post" enctype="multipart/form-data" class="space-y-2">
+            <input type="hidden" name="niche" value="{{ active_channel.niche }}" />
+            <input type="file" name="background_file" accept="video/*" required class="w-full text-xs text-zinc-400" />
+            <button type="submit" class="w-full bg-zinc-700 hover:bg-zinc-600 rounded-lg py-2 text-sm">{{ t('action.upload') }}</button>
+          </form>
+        </div>
+        {% endif %}
+
+        <details class="text-xs">
+          <summary class="text-zinc-500 cursor-pointer">{{ t('section.oauth_info') }}</summary>
+          <p class="mt-2 text-zinc-600">{{ t('oauth.redirect_uri') }}</p>
+          <code class="block mt-1 text-[10px] bg-zinc-900 p-2 rounded select-all">{{ oauth_status.redirect_uri }}</code>
+          <p class="mt-2 text-zinc-600">{{ t('oauth.panel_url') }} {{ panel_url }}</p>
+        </details>
+      </div>
+    </details>
+
+  </main>
+
+  <script>
+    (function () {
+      const picker = document.getElementById("channel-picker");
+      if (picker) {
+        picker.addEventListener("change", function () {
+          if (this.value) window.location.href = "/?channel=" + encodeURIComponent(this.value);
+        });
+      }
+
+      document.querySelectorAll(".js-schedule-tz").forEach((el) => {
+        el.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      });
+
+      const channelId = {{ active_channel_id | default(0) }} || null;
+
+      const I18N = {{ i18n_js|tojson }};
+
+      function bulkPanelChecks(panel) {
+        return Array.from(document.querySelectorAll('.js-bulk-check[data-bulk-panel="' + panel + '"]'));
+      }
+
+      function updateBulkForm(form) {
+        const panel = form.getAttribute("data-bulk-panel");
+        const checks = bulkPanelChecks(panel);
+        const n = checks.filter((c) => c.checked).length;
+        form.querySelectorAll(".js-bulk-count").forEach((el) => {
+          el.textContent = String(n);
+        });
+        form.querySelectorAll(".js-bulk-submit").forEach((btn) => {
+          btn.disabled = n === 0;
+        });
+      }
+
+      function findBulkForm(panel) {
+        return document.querySelector('.js-bulk-actions-form[data-bulk-panel="' + panel + '"]')
+          || document.querySelector('.js-bulk-delete-form[data-bulk-panel="' + panel + '"]');
+      }
+
+      document.querySelectorAll(".js-bulk-actions-form, .js-bulk-delete-form").forEach((form) => {
+        const panel = form.getAttribute("data-bulk-panel");
+        form.querySelector(".js-bulk-select-all")?.addEventListener("click", () => {
+          bulkPanelChecks(panel).forEach((c) => { c.checked = true; });
+          updateBulkForm(form);
+        });
+        form.querySelector(".js-bulk-clear")?.addEventListener("click", () => {
+          bulkPanelChecks(panel).forEach((c) => { c.checked = false; });
+          updateBulkForm(form);
+        });
+        form.querySelector(".js-bulk-delete")?.addEventListener("click", (e) => {
+          const n = bulkPanelChecks(panel).filter((c) => c.checked).length;
+          if (!n) {
+            e.preventDefault();
+            return;
+          }
+          const tpl = I18N["confirm.delete_jobs_bulk"] || "Delete {n} selected?";
+          if (!confirm(tpl.replace("{n}", String(n)))) e.preventDefault();
+        });
+      });
+
+      document.querySelectorAll(".js-bulk-check").forEach((cb) => {
+        cb.addEventListener("change", () => {
+          const panel = cb.getAttribute("data-bulk-panel");
+          const form = findBulkForm(panel);
+          if (form) updateBulkForm(form);
+        });
+      });
+      const pollMs = 4000;
+      let pollTimer = null;
+      let contentFingerprint = "{{ content_fingerprint }}";
+      let wasUploading = {{ 'true' if upload_active else 'false' }};
+      let wasProducing = {{ 'true' if processing_active else 'false' }};
+
+      function setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(value);
+      }
+
+      function setHidden(el, hidden) {
+        if (!el) return;
+        el.classList.toggle("hidden", hidden);
+      }
+
+      function updateProductionUi(data) {
+        const busy = !!(data.processing_active || data.pipeline_locked);
+        const runnable = data.production_count ?? 0;
+        const pending = data.pending_production_count ?? 0;
+        const activeId = data.active_job_id;
+
+        const failed = data.failed_count ?? 0;
+        setHidden(document.getElementById("produce-form"), busy || runnable === 0);
+        setHidden(document.getElementById("retry-failed-form"), busy || failed === 0);
+        setHidden(document.getElementById("produce-busy"), !busy);
+        setText("produce-count", runnable);
+        setText("retry-failed-count", failed);
+
+        const busyLabel = document.getElementById("produce-busy-label");
+        if (busyLabel) {
+          let label = I18N["banner.producing"] || "Producing";
+          if (activeId) label += " #" + activeId;
+          if (pending > 0) label += " · " + pending + " " + (I18N["banner.queued"] || "queued");
+          busyLabel.textContent = label + "…";
+        }
+
+        const banner = document.getElementById("processing-banner");
+        setHidden(banner, !busy);
+        const bannerText = document.getElementById("processing-banner-text");
+        if (bannerText && busy) {
+          let text = I18N["banner.production_progress"] || "Production in progress";
+          if (activeId) text += " — " + (I18N["banner.job"] || "job") + " #" + activeId;
+          if (pending > 0) text += " · " + pending + " " + (I18N["banner.more_in_queue"] || "more in queue");
+          bannerText.textContent = text;
+        }
+
+        document.querySelectorAll(".js-run-job").forEach((form) => setHidden(form, busy));
+        document.querySelectorAll(".js-queued-label").forEach((el) => {
+          const row = el.closest("[data-job-status]");
+          const status = row ? row.getAttribute("data-job-status") : "";
+          setHidden(el, !busy || status === "FAILED");
+        });
+        document.querySelectorAll(".js-pipeline-trigger button[type='submit']").forEach((btn) => {
+          btn.disabled = busy;
+        });
+
+        const processingStatuses = new Set(["GENERATING_TEXT", "GENERATING_AUDIO", "RENDERING"]);
+        (data.queue_jobs || []).forEach((job) => {
+          const row = document.querySelector('[data-job-id="' + job.id + '"]');
+          if (!row) return;
+          row.setAttribute("data-job-status", job.status);
+          const runForm = row.querySelector(".js-run-job");
+          const queued = row.querySelector(".js-queued-label");
+          let active = row.querySelector(".js-job-active");
+          const isActive = processingStatuses.has(job.status);
+
+          if (isActive) {
+            if (!active) {
+              active = document.createElement("span");
+              active.className = "js-job-active text-xs text-blue-400 px-2.5 py-1";
+              active.textContent = I18N["label.job_active"] || "Active";
+              const actions = row.querySelector(".flex.items-center.gap-2.shrink-0");
+              if (actions) actions.prepend(active);
+            }
+            setHidden(active, false);
+            setHidden(runForm, true);
+            setHidden(queued, true);
+          } else {
+            if (active) setHidden(active, true);
+            if (job.status === "PENDING") {
+              setHidden(runForm, busy);
+              setHidden(queued, !busy);
+            } else if (job.status === "FAILED") {
+              setHidden(runForm, busy);
+              setHidden(queued, true);
+            }
+          }
+        });
+      }
+
+      function updateUploadUi(data) {
+        const uploading = !!data.upload_active;
+        const ready = data.upload_ready_count ?? 0;
+        setHidden(document.getElementById("upload-form"), uploading || ready === 0);
+        setHidden(document.getElementById("upload-busy"), !uploading);
+        const countEl = document.getElementById("upload-count");
+        if (countEl) countEl.textContent = String(ready);
+        document.querySelectorAll(".js-upload-trigger button[type='submit']").forEach((btn) => {
+          btn.disabled = uploading;
+        });
+      }
+
+      function pollStatus() {
+        const url = channelId
+          ? "{{ url_for('api_dashboard_status') }}?channel=" + channelId
+          : "{{ url_for('api_dashboard_status') }}";
+        fetch(url, { headers: { Accept: "application/json" } })
+          .then((r) => r.json())
+          .then((data) => {
+            const c = data.counts || {};
+            setText("stat-pending", c.PENDING ?? 0);
+            setText("stat-processing", data.stat_processing ?? 0);
+            setText("stat-ready", data.stat_ready ?? 0);
+            setText("stat-youtube", data.stat_youtube ?? 0);
+            setText("stat-failed", c.FAILED ?? 0);
+            updateProductionUi(data);
+            updateUploadUi(data);
+
+            const fp = data.content_fingerprint || "";
+            const producing = !!(data.processing_active || data.pipeline_locked);
+            const uploading = !!data.upload_active;
+
+            if (fp && fp !== contentFingerprint) {
+              if (!producing && !uploading) {
+                window.location.reload();
+                return;
+              }
+              contentFingerprint = fp;
+            }
+
+            if (wasUploading && !uploading) {
+              window.location.reload();
+              return;
+            }
+            if (wasProducing && !producing && (data.production_count ?? 0) === 0) {
+              window.location.reload();
+              return;
+            }
+            wasUploading = uploading;
+            wasProducing = producing;
+
+            const keepPolling =
+              producing ||
+              uploading ||
+              (data.production_count ?? 0) > 0 ||
+              (data.upload_ready_count ?? 0) > 0 ||
+              (data.stat_processing ?? 0) > 0;
+            if (keepPolling) pollTimer = setTimeout(pollStatus, pollMs);
+          })
+          .catch(() => { pollTimer = setTimeout(pollStatus, pollMs * 2); });
+      }
+
+      pollTimer = setTimeout(pollStatus, pollMs);
+    })();
+  </script>
+</body>
+</html>
